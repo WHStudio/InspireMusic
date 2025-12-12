@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { Song } from '../types';
 import { X, Play, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { motion } from 'framer-motion';
 
 interface QueueViewProps {
   queue: Song[];
@@ -21,34 +20,57 @@ export const QueueView: React.FC<QueueViewProps> = ({
   onClose,
   onClear,
 }) => {
-  const [confirmClear, setConfirmClear] = React.useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
-  React.useEffect(() => {
+  // Entry animation
+  useEffect(() => {
+    const timer = requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+    return () => cancelAnimationFrame(timer);
+  }, []);
+
+  // Handle close with exit animation
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setIsVisible(false);
+    setTimeout(onClose, 300);
+  }, [onClose]);
+
+  // Confirm clear timer
+  useEffect(() => {
     if (confirmClear) {
       const timer = setTimeout(() => setConfirmClear(false), 3000);
       return () => clearTimeout(timer);
     }
   }, [confirmClear]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setIsVisible(false);
+    };
+  }, []);
+
   return (
     <>
       {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 bg-black/50 z-[59]"
-        onClick={onClose}
+      <div
+        className={clsx(
+          "fixed inset-0 bg-black/50 z-[59] transition-opacity duration-300",
+          isVisible && !isClosing ? "opacity-100" : "opacity-0"
+        )}
+        onClick={handleClose}
       />
 
       {/* Drawer */}
-      <motion.div
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed inset-y-0 right-0 w-full md:w-80 bg-surface shadow-2xl z-[60] border-l border-gray-800 flex flex-col"
+      <div
+        className={clsx(
+          "fixed inset-y-0 right-0 w-full md:w-80 bg-surface shadow-2xl z-[60] border-l border-gray-800 flex flex-col transition-transform duration-300 ease-out",
+          isVisible && !isClosing ? "translate-x-0" : "translate-x-full"
+        )}
       >
         <div className="p-4 border-b border-gray-800 flex items-center justify-between">
           <h2 className="font-bold text-white">播放队列 ({queue.length})</h2>
@@ -58,6 +80,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                 if (confirmClear) {
                   onClear();
                   setConfirmClear(false);
+                  handleClose();
                 } else {
                   setConfirmClear(true);
                 }
@@ -70,7 +93,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
             >
               <Trash2 size={18} />
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <button onClick={handleClose} className="text-gray-400 hover:text-white">
               <X size={20} />
             </button>
           </div>
@@ -81,7 +104,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
             <div
               key={`${song.platform}-${song.id}-${index}`}
               className={clsx(
-                "group flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-white/5",
+                "group flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors",
                 index === currentIndex ? "text-primary" : "text-gray-300"
               )}
               onDoubleClick={() => onPlay(index)}
@@ -111,14 +134,14 @@ export const QueueView: React.FC<QueueViewProps> = ({
                   e.stopPropagation();
                   onRemove(index);
                 }}
-                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-white"
+                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-white transition-opacity"
               >
                 <X size={14} />
               </button>
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
     </>
   );
 };

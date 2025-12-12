@@ -33,7 +33,7 @@ export const PlaylistGrid: React.FC<PlaylistGridProps> = ({
                     };
                     onSelectPlaylist(favPlaylist);
                 }}
-                className="group bg-gradient-to-br from-purple-900 to-blue-900 hover:brightness-110 rounded-lg p-4 cursor-pointer transition-all"
+                className="group bg-surface hover:bg-surface/80 rounded-lg p-4 cursor-pointer transition-colors"
             >
                 <div className="aspect-square rounded-md mb-4 flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-pink-500 to-purple-600 shadow-lg">
                     <Heart size={48} fill="white" className="text-white" />

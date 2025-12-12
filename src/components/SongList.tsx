@@ -1,4 +1,5 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useRef, useEffect, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Play, Pause } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Song, Platform } from '../types';
@@ -124,6 +125,11 @@ const SongRow = memo<SongRowProps>(({ song, index, isCurrent, isPlaying, onPlay 
 
 SongRow.displayName = 'SongRow';
 
+// Row height constant for virtualization
+const ROW_HEIGHT = 64; // px - matches py-3 (12px*2) + content (~40px)
+// Increase threshold to avoid issues with containers that don't have fixed height
+const VIRTUALIZATION_THRESHOLD = 200;
+
 export const SongList: React.FC<SongListProps> = memo(({
   songs,
   currentSong,
@@ -131,8 +137,73 @@ export const SongList: React.FC<SongListProps> = memo(({
   onPlay,
   showHeader = true,
 }) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
+
+  // Measure container height for virtualization
+  useEffect(() => {
+    if (!parentRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+
+    observer.observe(parentRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Determine if we should use virtualization
+  // Only virtualize if we have many items AND the container has a measured height
+  const shouldVirtualize = songs.length > VIRTUALIZATION_THRESHOLD && containerHeight > 0;
+
+  const virtualizer = useVirtualizer({
+    count: songs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10, // Render 10 extra items above/below viewport for smooth scrolling
+    enabled: shouldVirtualize,
+  });
+
+  // For most lists, render normally (no virtualization overhead)
+  // This ensures compatibility with all container types
+  if (!shouldVirtualize) {
+    return (
+      <div className="w-full flex flex-col">
+        {showHeader && (
+          <div className="grid grid-cols-[auto_1fr] md:grid-cols-[auto_4fr_3fr_2fr_1fr] gap-4 px-4 py-2 border-b border-gray-800 text-gray-400 text-sm font-medium sticky top-0 bg-background z-10">
+            <div className="w-8 text-center">#</div>
+            <div>标题</div>
+            <div className="hidden md:block">歌手</div>
+            <div className="hidden md:block">专辑</div>
+            <div className="hidden md:block text-right">来源</div>
+          </div>
+        )}
+        <div className="flex flex-col pb-4">
+          {songs.map((song, index) => {
+            const isCurrent = currentSong?.id === song.id && currentSong?.platform === song.platform;
+            return (
+              <SongRow
+                key={`${song.platform}-${song.id}`}
+                song={song}
+                index={index}
+                isCurrent={isCurrent}
+                isPlaying={isPlaying && isCurrent}
+                onPlay={onPlay}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Virtualized list for very large datasets (200+ items)
+  const virtualItems = virtualizer.getVirtualItems();
+
   return (
-    <div className="w-full flex flex-col">
+    <div className="w-full flex flex-col" style={{ height: '70vh', minHeight: '400px' }}>
       {showHeader && (
         <div className="grid grid-cols-[auto_1fr] md:grid-cols-[auto_4fr_3fr_2fr_1fr] gap-4 px-4 py-2 border-b border-gray-800 text-gray-400 text-sm font-medium sticky top-0 bg-background z-10">
           <div className="w-8 text-center">#</div>
@@ -142,20 +213,44 @@ export const SongList: React.FC<SongListProps> = memo(({
           <div className="hidden md:block text-right">来源</div>
         </div>
       )}
-      <div className="flex flex-col pb-4">
-        {songs.map((song, index) => {
-          const isCurrent = currentSong?.id === song.id && currentSong?.platform === song.platform;
-          return (
-            <SongRow
-              key={`${song.platform}-${song.id}`}
-              song={song}
-              index={index}
-              isCurrent={isCurrent}
-              isPlaying={isPlaying && isCurrent}
-              onPlay={onPlay}
-            />
-          );
-        })}
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-auto"
+      >
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualItems.map((virtualRow) => {
+            const song = songs[virtualRow.index];
+            const isCurrent = currentSong?.id === song.id && currentSong?.platform === song.platform;
+
+            return (
+              <div
+                key={`${song.platform}-${song.id}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <SongRow
+                  song={song}
+                  index={virtualRow.index}
+                  isCurrent={isCurrent}
+                  isPlaying={isPlaying && isCurrent}
+                  onPlay={onPlay}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

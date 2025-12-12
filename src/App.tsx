@@ -971,55 +971,52 @@ function App() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showQueue && (
-          <QueueView
-            queue={queue}
-            currentIndex={queueIndex}
-            onPlay={(index) => {
-              shouldAutoPlayRef.current = true;
-              setQueueIndex(index);
-              const targetSong = queue[index];
-              // 如果是同一首歌，需要强制触发播放
-              if (currentSong && targetSong.id === currentSong.id && targetSong.platform === currentSong.platform) {
-                // 强制播放当前已加载的歌曲
-                if (audioRef.current) {
-                  audioRef.current.currentTime = 0;
-                  audioRef.current.play().catch(() => setIsPlaying(false));
-                }
-              } else {
-                setCurrentSong(targetSong);
-              }
-            }}
-            onRemove={(index) => {
-              const newQueue = queue.filter((_, i) => i !== index);
-              setQueue(newQueue);
-              if (index < queueIndex) {
-                setQueueIndex(queueIndex - 1);
-              } else if (index === queueIndex) {
-                if (newQueue.length === 0) {
-                  setCurrentSong(null);
-                  setIsPlaying(false);
-                } else {
-                  const nextIdx = Math.min(index, newQueue.length - 1);
-                  setQueueIndex(nextIdx);
-                  setCurrentSong(newQueue[nextIdx]);
-                }
-              }
-            }}
-            onClose={() => setShowQueue(false)}
-            onClear={() => {
+      {showQueue && (
+        <QueueView
+          queue={queue}
+          currentIndex={queueIndex}
+          onPlay={(index) => {
+            shouldAutoPlayRef.current = true;
+            setQueueIndex(index);
+            const targetSong = queue[index];
+            // 如果是同一首歌，需要强制触发播放
+            if (currentSong && targetSong.id === currentSong.id && targetSong.platform === currentSong.platform) {
+              // 强制播放当前已加载的歌曲
               if (audioRef.current) {
-                audioRef.current.pause();
                 audioRef.current.currentTime = 0;
+                audioRef.current.play().catch(() => setIsPlaying(false));
               }
-              setQueue([]);
-              setCurrentSong(null);
-              setIsPlaying(false);
-            }}
-          />
-        )}
-      </AnimatePresence>
+            } else {
+              setCurrentSong(targetSong);
+            }
+          }}
+          onRemove={(index) => {
+            const newQueue = queue.filter((_, i) => i !== index);
+            setQueue(newQueue);
+            if (index < queueIndex) {
+              setQueueIndex(queueIndex - 1);
+            } else if (index === queueIndex) {
+              if (newQueue.length === 0) {
+                setCurrentSong(null);
+                setIsPlaying(false);
+              } else {
+                const nextIdx = Math.min(index, newQueue.length - 1);
+                setQueueIndex(nextIdx);
+                setCurrentSong(newQueue[nextIdx]);
+              }
+            }
+          }}
+          onClose={() => setShowQueue(false)}
+          onClear={() => {
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.currentTime = 0;
+            }
+            setQueue([]);
+            setCurrentSong(null);
+            setIsPlaying(false);
+          }}
+        />)}
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 

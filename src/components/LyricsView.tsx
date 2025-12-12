@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import type { ParsedLyricLine, Song } from '../types';
 import { ChevronDown, AudioLines } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -32,11 +31,36 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAutoScrollingRef = useRef(false);
   const lastActiveLyricIndexRef = useRef(activeLyricIndex);
+  const [isVisible, setIsVisible] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Check if lyrics contain translations
   const hasTranslations = useMemo(() => {
     return lyrics.some(line => line.translation);
   }, [lyrics]);
+
+  // Clear lyric refs when lyrics change (fix memory leak)
+  useEffect(() => {
+    lyricRefs.current.clear();
+  }, [lyrics]);
+
+  // Cleanup on unmount (fix memory leak)
+  useEffect(() => {
+    return () => {
+      lyricRefs.current.clear();
+      if (userScrollTimeoutRef.current) {
+        clearTimeout(userScrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Entry animation
+  useEffect(() => {
+    const timer = requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+    return () => cancelAnimationFrame(timer);
+  }, []);
 
   // Register lyric element ref
   const setLyricRef = useCallback((index: number, el: HTMLDivElement | null) => {
@@ -79,6 +103,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
   const handleWheel = useCallback(() => {
     // User is actively scrolling with mouse wheel
     setUserScrolling(true);
+    setShowScrollButton(true);
     
     if (userScrollTimeoutRef.current) {
       clearTimeout(userScrollTimeoutRef.current);
@@ -86,12 +111,14 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     
     userScrollTimeoutRef.current = setTimeout(() => {
       setUserScrolling(false);
+      setShowScrollButton(false);
     }, 4000);
   }, []);
 
   // Handle touch interaction to detect user scrolling
   const handleTouchStart = useCallback(() => {
     setUserScrolling(true);
+    setShowScrollButton(true);
     if (userScrollTimeoutRef.current) {
       clearTimeout(userScrollTimeoutRef.current);
     }
@@ -103,6 +130,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     }
     userScrollTimeoutRef.current = setTimeout(() => {
       setUserScrolling(false);
+      setShowScrollButton(false);
     }, 4000);
   }, []);
 
@@ -128,34 +156,32 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
     }
   }, [lyrics]); // Re-run when lyrics change (new song)
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (userScrollTimeoutRef.current) {
-        clearTimeout(userScrollTimeoutRef.current);
-      }
-    };
-  }, []);
-
   // Handle lyric click to seek
   const handleLyricClick = useCallback((time: number) => {
     if (onSeek) {
       onSeek(time);
       setUserScrolling(false);
+      setShowScrollButton(false);
     }
   }, [onSeek]);
 
+  // Handle close with exit animation
+  const handleClose = useCallback(() => {
+    setIsVisible(false);
+    setTimeout(onClose, 300);
+  }, [onClose]);
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 50 }}
-      className="fixed inset-0 bg-gradient-to-b from-gray-900 to-black z-40 flex flex-col"
+    <div 
+      className={clsx(
+        "fixed inset-0 bg-gradient-to-b from-gray-900 to-black z-40 flex flex-col transition-all duration-300 ease-out",
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+      )}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-8 py-6">
         <button 
-          onClick={onClose}
+          onClick={handleClose}
           className="p-2 rounded-full hover:bg-white/10 transition-colors"
         >
           <ChevronDown size={32} />
@@ -171,40 +197,39 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
       <div className="flex-1 flex overflow-hidden pb-24">
         {/* Left: Cover Art (Desktop) */}
         <div className="hidden md:flex w-1/2 items-center justify-center p-12">
-          <motion.div 
+          <div 
             key={currentSong?.id}
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="w-full max-w-md aspect-square"
+            className={clsx(
+              "w-full max-w-md aspect-square transition-all duration-500 ease-out",
+              isVisible ? "scale-100 opacity-100" : "scale-90 opacity-0"
+            )}
           >
             <CoverImage 
               src={coverUrl || currentSong?.pic} 
               alt={currentSong?.name} 
               className="w-full h-full object-cover rounded-lg shadow-2xl"
             />
-          </motion.div>
+          </div>
         </div>
 
         {/* Right: Lyrics */}
         <div className="w-full md:w-1/2 relative">
           {/* User scrolling indicator */}
-          <AnimatePresence>
-            {userScrolling && activeLyricIndex >= 0 && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={() => {
-                  setUserScrolling(false);
-                  scrollToActiveLyric(activeLyricIndex, true);
-                }}
-                className="absolute bottom-24 right-6 z-20 p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-xl hover:bg-white/20 transition-all"
-              >
-                <AudioLines size={24} fill="currentColor" />
-              </motion.button>
+          <button
+            onClick={() => {
+              setUserScrolling(false);
+              setShowScrollButton(false);
+              scrollToActiveLyric(activeLyricIndex, true);
+            }}
+            className={clsx(
+              "absolute bottom-24 right-6 z-20 p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-xl hover:bg-white/20 transition-all duration-200",
+              showScrollButton && activeLyricIndex >= 0 
+                ? "opacity-100 scale-100" 
+                : "opacity-0 scale-80 pointer-events-none"
             )}
-          </AnimatePresence>
+          >
+            <AudioLines size={24} fill="currentColor" />
+          </button>
           
           <div 
             ref={containerRef}
@@ -224,22 +249,18 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
                 const isPast = index < activeLyricIndex;
                 
                 return (
-                  <motion.div
+                  <div
                     key={index}
                     ref={(el) => setLyricRef(index, el)}
-                    initial={false}
-                    animate={{ 
-                      scale: isActive ? 1.05 : 1,
+                    className={clsx(
+                      "text-center md:text-left cursor-pointer select-none transition-all duration-300 ease-out",
+                      hasTranslations ? "mb-6" : "mb-5",
+                      isActive ? "scale-105 opacity-100" : isPast ? "scale-100 opacity-50" : "scale-100 opacity-70"
+                    )}
+                    style={{
+                      transform: isActive ? 'scale(1.05)' : 'scale(1)',
                       opacity: isActive ? 1 : isPast ? 0.5 : 0.7,
                     }}
-                    transition={{
-                      duration: 0.4,
-                      ease: 'easeOut',
-                    }}
-                    className={clsx(
-                      "text-center md:text-left cursor-pointer select-none",
-                      hasTranslations ? "mb-6" : "mb-5",
-                    )}
                     onClick={() => handleLyricClick(line.time)}
                   >
                     {/* Main lyric text */}
@@ -268,7 +289,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
                         {line.translation}
                       </div>
                     )}
-                  </motion.div>
+                  </div>
                 );
               })
             ) : (
@@ -277,6 +298,6 @@ export const LyricsView: React.FC<LyricsViewProps> = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };

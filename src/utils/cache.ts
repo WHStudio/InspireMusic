@@ -295,3 +295,79 @@ if (typeof window !== 'undefined') {
     cleanupExpiredCache();
   }, 5000);
 }
+
+/**
+ * 清理用户数据（保留音质设置、歌单和收藏）
+ * @returns 清理结果统计
+ */
+export const clearUserData = (): { clearedCount: number; totalSize: number } => {
+  // 需要清除的用户数据键
+  const clearKeys = [
+    'inspire-volume',
+    'inspire-queue',
+    'inspire-queue-index',
+    'inspire-progress',
+    'search-history',
+  ];
+
+  let clearedCount = 0;
+  let totalSize = 0;
+
+  // 先清除所有 API 缓存
+  const cacheStats = getCacheStats();
+  totalSize += cacheStats.size;
+  clearedCount += cacheStats.count;
+  clearAllCache();
+
+  // 清除指定的用户数据键
+  for (const key of clearKeys) {
+    try {
+      const item = localStorage.getItem(key);
+      if (item) {
+        totalSize += estimateSize(item);
+        localStorage.removeItem(key);
+        clearedCount++;
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  return { clearedCount, totalSize };
+};
+
+/**
+ * 获取可清理数据的大小统计
+ */
+export const getClearableDataStats = (): { count: number; size: number } => {
+  const clearKeys = [
+    'inspire-volume',
+    'inspire-queue',
+    'inspire-queue-index',
+    'inspire-progress',
+    'search-history',
+  ];
+
+  let count = 0;
+  let size = 0;
+
+  // API 缓存统计
+  const cacheStats = getCacheStats();
+  count += cacheStats.count;
+  size += cacheStats.size;
+
+  // 用户数据统计
+  for (const key of clearKeys) {
+    try {
+      const item = localStorage.getItem(key);
+      if (item) {
+        size += estimateSize(item);
+        count++;
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  return { count, size };
+};

@@ -4,6 +4,7 @@ import { QualitySettingsSection } from './library/QualitySettingsSection';
 import { SleepTimerSection } from './library/SleepTimerSection';
 import { ImportPlaylistSection } from './library/ImportPlaylistSection';
 import { PlaylistGrid } from './library/PlaylistGrid';
+import { ClearCacheSection } from './library/ClearCacheSection';
 
 interface LibraryViewProps {
     playlists: LocalPlaylist[];
@@ -47,7 +48,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </div>
 
             {/* Settings Section */}
-            <div className="bg-surface p-4 md:p-6 rounded-xl mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-surface p-4 md:p-6 rounded-xl mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                 <QualitySettingsSection
                     quality={quality}
                     onQualityChange={onQualityChange}
@@ -57,6 +58,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     onSetSleepTimer={onSetSleepTimer}
                     onCancelSleepTimer={onCancelSleepTimer}
                 />
+                <ClearCacheSection />
             </div>
 
             {/* Import Section */}
@@ -90,7 +92,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                             TuneHub API
                         </a>
                     </p>
-                    <p>Version 1.1.0</p>
+                    <p>Version 1.1.1</p>
                 </div>
             </div>
         </div>
